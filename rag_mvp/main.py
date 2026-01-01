@@ -22,6 +22,10 @@ dp = Dispatcher()
 MENU_KEYBOARD = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="/status")], [KeyboardButton(text="/reset")]
     ], resize_keyboard=True)
+ALLOWED_SUFFIXES = {".txt", ".md", ".pdf",
+    ".docx", ".pptx", ".xlsx",
+    ".html", ".htm",
+    ".csv", ".json"}
 
 # словарь {chat_id: path}, который содержит инфу по активному файлу для чата
 LAST_DOC_PATH = {}
@@ -44,8 +48,10 @@ async def on_document(message):
     filename = (doc.file_name or "document.txt").strip()
     suffix = Path(filename).suffix.lower()
 
-    if suffix not in {".txt", ".md"}:
-        await message.answer("Пришлите файл только в формате .txt или .md")
+    if suffix not in ALLOWED_SUFFIXES:
+        await message.answer(
+            "Неподходящий формат файла.\n"
+            "Поддерживаю: " + ", ".join(sorted(ALLOWED_SUFFIXES)))
         return
     
     chat_dir = DATA_DIR / "uploads" / str(chat_id)
@@ -78,7 +84,7 @@ async def status(message):
 
     if not doc_path or not doc_path.exists():
         await message.answer(
-            "Сейчас нет активного файла. Пришли файл формата .txt или .md",
+            "Сейчас нет активного файла. Пришли файл, по которому есть вопросы!",
             reply_markup=MENU_KEYBOARD
             )
         return
@@ -95,11 +101,11 @@ async def reset(message):
     if chat_id in LAST_DOC_PATH:
         del LAST_DOC_PATH[chat_id]
         await message.answer(
-            "Ок! Активный файл сброшен. Пришли новый файл формата .txt или .md",
+            "Ок! Активный файл сброшен. Пришли новый файл!",
             reply_markup=MENU_KEYBOARD)
     else:
         await message.answer(
-            "Нечего сбрасывать: активного файла нет. Пришли новый файл формата .txt или .md",
+            "Нечего сбрасывать: активного файла нет. Пришли новый файл!",
             reply_markup=MENU_KEYBOARD)
 
 @dp.message(F.text)
@@ -114,7 +120,7 @@ async def text_as_question(message):
     if not doc_path or not doc_path.exists():
         await message.answer(
             "Активного файла нет \n"
-            "Сначала пришлите файл .txt или .md.",
+            "Пришлите его для разбора!",
         )
         return
     # тут будет RAG

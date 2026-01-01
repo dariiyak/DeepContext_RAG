@@ -12,13 +12,45 @@ def save_bytes(path, data):
 # чтение текста из файла с защитой на max_chars
 def read_text_file(path, max_chars=200000):
     suffix = path.suffix.lower()
-    if suffix not in {".txt", ".md"}:
-        raise ValueError(f"Недоступный тип файла: {suffix}. Используйте .txt or .md")
-    raw = path.read_bytes()
-    try:
-        text = raw.decode("utf-8")
-    except:
-        text = raw.decode("cp1251", errors="replace")
+    if suffix in {".txt", ".md"}:
+        text = read_text_txt_md(path)
+    elif suffix == ".pdf":
+        text = read_text_pdf(path)
+    else:
+        text = read_text_markitdown(path)
     if len(text) > max_chars:
         text = text[:max_chars] + "\n\n...[обрезано]..."
     return text
+
+def read_text_txt_md(path):
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except Exception:
+        text = raw.decode("cp1251", errors="replace")
+    return text
+
+def read_text_pdf(path):
+    import fitz
+
+    parts = []
+    with fitz.open(path) as doc:
+        for i, page in enumerate(doc, start=1):
+            page_text = page.get_text("text", sort=True)
+            page_text = page_text.strip()
+            if page_text:
+                parts.append(f"\n\n--- page {i} ---\n{page_text}")
+
+    text = "".join(parts).strip()
+    if not text:
+        text = "В этом pdf текст не найден"
+    return text
+
+def read_text_markitdown(path):
+    try:
+        from markitdown import MarkItDown
+        md = MarkItDown()
+        result = md.convert(str(path))
+        return result.text_content or ""
+    except Exception as ex:
+        return f"[Не удалось конвертировать файл: {ex}]"
