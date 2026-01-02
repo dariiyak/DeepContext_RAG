@@ -54,3 +54,18 @@ def read_text_markitdown(path):
         return result.text_content or ""
     except Exception as ex:
         return f"[Не удалось конвертировать файл: {ex}]"
+    
+def chunk_text(text, chunk_size=1200, overlap=150):
+    chunks = []
+    start = 0
+    n = len(text)
+    while start < n:
+        end = min(start + chunk_size, n)
+        chunks.append(text[start:end])
+        start = end - overlap 
+        if start < 0:
+            start = 0
+        if end == n:
+            break
+    return chunks
+
