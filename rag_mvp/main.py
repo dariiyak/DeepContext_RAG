@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from utils import ensure_dir, save_bytes, read_text_file, chunk_text
 from embeddings import embed_texts
 from retrieval import retrieve_top_k
+from llm import answer_with_gigachat
 
 load_dotenv()
 
@@ -79,7 +80,7 @@ async def on_document(message):
         LAST_DOC_TEXT[chat_id] = text
         chunks = chunk_text(text)
         LAST_DOC_CHUNKS[chat_id] = chunks
-        await message.answer("Изучаю элемент")
+        await message.answer("Индексирую файл...")
         LAST_DOC_EMBEDS[chat_id] = await asyncio.to_thread(embed_texts, chunks)
     except Exception as ex:
         await message.answer(f"Ошибка чтения файла: {ex}")
@@ -165,12 +166,13 @@ async def text_as_question(message):
         await message.answer("Не нашёл релевантных фрагментов в документе")
         return
 
-    context = "\n\n---\n\n".join([f"{ch}" for _, s, ch in top])
+    context = "\n\n---\n\n".join([ch for _, s, ch in top])
     
-    await message.answer(
-    "Возможный ответ на основе документа:\n\n"
-    f"{context[:3500]}"
-)
+    await message.answer("Думаю над ответом c GigaChat...")
+
+    final_answer = await asyncio.to_thread(answer_with_gigachat, text, context)
+    await message.answer(final_answer[:3500])
+    
 
 async def main():
     ensure_dir(DATA_DIR)
