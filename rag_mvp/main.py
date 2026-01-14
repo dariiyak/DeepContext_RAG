@@ -37,8 +37,6 @@ LAST_DOC_PATH = {}
 LAST_DOC_TEXT = {}
 # словарь {chat_id: list[str]}, содержит кэш чанков
 LAST_DOC_CHUNKS = {}
-# словарь {chat_id: np.ndarray} матрица эмбеддингов чанков
-LAST_DOC_EMBEDS = {}
 
 @dp.message(CommandStart())
 async def start(message):
@@ -80,8 +78,8 @@ async def on_document(message):
         LAST_DOC_TEXT[chat_id] = text
         chunks = chunk_text(text)
         LAST_DOC_CHUNKS[chat_id] = chunks
-        await message.answer("Индексирую файл...")
-        LAST_DOC_EMBEDS[chat_id] = await asyncio.to_thread(embed_texts, chunks)
+        await message.answer("Индексирую файл в Milvus...")
+        embs = await asyncio.to_thread(embed_texts, chunks)
     except Exception as ex:
         await message.answer(f"Ошибка чтения файла: {ex}")
         return
