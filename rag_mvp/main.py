@@ -10,18 +10,20 @@ from dotenv import load_dotenv
 
 from utils import ensure_dir, save_bytes, read_text_file, chunk_text
 from embeddings import embed_texts
-from retrieval import retrieve_top_k
 from llm import answer_with_gigachat
+from milvus_store import MilvusStore
 
 load_dotenv()
 
-TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN").strip()
+TG_BOT_TOKEN = (os.getenv("TG_BOT_TOKEN") or "").strip()
 if not TG_BOT_TOKEN:
     raise RuntimeError("Вы забыли вставить TG_BOT_TOKEN.")
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data")).resolve()
 
 bot = Bot(token=TG_BOT_TOKEN)
 dp = Dispatcher()
+
+store = MilvusStore()
 
 MENU_KEYBOARD = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="/status")], [KeyboardButton(text="/reset")]
@@ -37,6 +39,8 @@ LAST_DOC_PATH = {}
 LAST_DOC_TEXT = {}
 # словарь {chat_id: list[str]}, содержит кэш чанков
 LAST_DOC_CHUNKS = {}
+# словарь {chat_id: np.ndarray}, содержит эмбеддинги
+LAST_DOC_EMBEDS = {}
 
 @dp.message(CommandStart())
 async def start(message):
@@ -80,6 +84,11 @@ async def on_document(message):
         LAST_DOC_CHUNKS[chat_id] = chunks
         await message.answer("Индексирую файл в Milvus...")
         embs = await asyncio.to_thread(embed_texts, chunks)
+
+        LAST_DOC_EMBEDS[chat_id] = embs
+
+        await asyncio.to_thread(store.reset_chat, chat_id)
+        await asyncio.to_thread(store.upsert_chunks, chat_id, str(save_path), chunks, embs)
     except Exception as ex:
         await message.answer(f"Ошибка чтения файла: {ex}")
         return
@@ -116,6 +125,8 @@ async def reset(message):
         LAST_DOC_TEXT.pop(chat_id, None)
         LAST_DOC_CHUNKS.pop(chat_id, None)
         LAST_DOC_EMBEDS.pop(chat_id, None)
+
+        await asyncio.to_thread(store.reset_chat, chat_id)
         await message.answer(
             "Ок! Активный файл сброшен. Пришли новый файл!",
             reply_markup=MENU_KEYBOARD)
@@ -158,13 +169,13 @@ async def text_as_question(message):
     
     q = await asyncio.to_thread(embed_texts, [text])
     q = q[0]
-    
-    top = retrieve_top_k(q, chunks, chunks_embed, k=4)
-    if not top:
-        await message.answer("Не нашёл релевантных фрагментов в документе")
+
+    hits = await asyncio.to_thread(store.search, chat_id, q, 4)
+    if not hits:
+        await message.answer("Не нашёл релевантных фрагментов в базе (Milvus)")
         return
 
-    context = "\n\n---\n\n".join([ch for _, s, ch in top])
+    context = "\n\n---\n\n".join(ch for score, ch in hits if ch)
     
     await message.answer("Думаю над ответом c GigaChat...")
 
