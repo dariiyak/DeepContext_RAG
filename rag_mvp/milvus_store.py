@@ -83,7 +83,7 @@ class MilvusStore:
         out = []
         hits = res[0] if res else []
         for hit in hits:
-            score = hit.score
+            score = float(getattr(hit, "score", getattr(hit, "distance", 0.0)))
             text = hit.entity.get("text")
             out.append((score, text))
         return out
