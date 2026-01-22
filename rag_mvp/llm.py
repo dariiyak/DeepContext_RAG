@@ -5,6 +5,15 @@ import uuid
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
+DEFAULT_SYSTEM_PROMPT = (
+    "Ты — ассистент RAG-системы. "
+    "Отвечай только на основе переданного контекста. "
+    "Если информации недостаточно, честно скажи об этом. "
+    "Не придумывай факты и не добавляй сведения, которых нет в контексте. "
+    "Если фрагменты противоречат друг другу, укажи на это. "
+    "Отвечай по-русски, кратко, структурированно и логично."
+)
+
 def get_access_token():
     auth_key = os.getenv("GIGACHAT_AUTH_KEY")
     if not auth_key:
@@ -29,7 +38,7 @@ def get_access_token():
 def answer_with_gigachat(question, context):
     token = get_access_token()
 
-    model = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro")
+    model = os.getenv("GIGACHAT_MODEL", "GigaChat-2")
 
     headers = {
         "Accept": "application/json",
@@ -40,7 +49,7 @@ def answer_with_gigachat(question, context):
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "Отвечай ТОЛЬКО по контексту. Если ответа нет — так и скажи."},
+            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": f"КОНТЕКСТ:\n{context}\n\nВОПРОС:\n{question}"},
         ],
         "temperature": 0.2
